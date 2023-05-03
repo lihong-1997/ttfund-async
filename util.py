@@ -19,7 +19,7 @@ def async_timed():
 
 
 def save_to_csv(path, **kwargs):
-    with open(path, 'w', encoding='utf-8', newline="") as f:
+    with open(path, 'w', encoding='utf_8_sig', newline="") as f:
         csv_writer = csv.writer(f)
         csv_writer.writerow(kwargs.keys())
         data = list(kwargs.values())
@@ -29,4 +29,3 @@ def save_to_csv(path, **kwargs):
             for j in range(len(data)):
                 row_data.append(data[j][i])
             csv_writer.writerow(row_data)
-        f.close()

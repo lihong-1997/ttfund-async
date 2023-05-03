@@ -234,8 +234,7 @@ class Crawl(GetToken):
             'version': self.app_version
         }
         async with session.post(url, data=data) as response:
-            res = await response.read()
-            json_response = json.loads(res)
+            json_response = await response.json()
             is_valid = (json_response['data'] is not None)
             assert is_valid, f"<{tg['name']}>提供的<{tg['tg_name']}>策略暂无信息."
             row_name_list = ['策略名称', '机构', '策略理念', '成立来收益', '日涨幅', '风险等级', '建议持有', '成立天数', '业绩比较基准']
@@ -273,14 +272,19 @@ class Crawl(GetToken):
             }
             row_value_list.append(risk_level[data['tgExtendInfo']['RISKLEVEL']])
             # 处理建议持有
-            if info_dict.get('RECOMMEND_HOLD_TIME') is not None:
-                row_value_list.append(info_dict['RECOMMEND_HOLD_TIME'])
+            recommend_hold_time = info_dict.get('RECOMMEND_HOLD_TIME')
+            if recommend_hold_time is not None:
+                row_value_list.append(recommend_hold_time)
             else:
                 row_value_list.append('--')
             # 处理成立天数
             row_value_list.append(str(data['tgExtendInfo']['continuedData']) + '天')
             # 处理业绩比较标准
-            row_value_list.append(data['tgExtendInfo']['BASIC_CAL_FORMULA_REMARK'])
+            basic_cal_formula_remark = info_dict.get('BASIC_CAL_FORMULA_REMARK')
+            if basic_cal_formula_remark is not None:
+                row_value_list.append(basic_cal_formula_remark)
+            else:
+                row_value_list.append('--')
             # 处理特殊数据
             ch_data = {
                 "user_POSITIVE_RATIO": "用户持仓正收益占比",
@@ -299,25 +303,28 @@ class Crawl(GetToken):
             tg_characteristics_page2 = dict(data['tgCharacteristics']['tgCharacteristicsPage2'])
             for key, value in tg_characteristics_page2.items():
                 if key in ["user_POSITIVE_RATIO", "user_FGRATIO", "user_AVGDAY", "user_STAY_RATIO"]:
-                    row_name_list.append(ch_data[key])
-                    if key == "user_AVGDAY":
-                        row_value_list.append(str(value) + '天')
-                    else:
-                        row_value_list.append(str(value) + '%')
+                    if value is not None:
+                        row_name_list.append(ch_data[key])
+                        if key == "user_AVGDAY":
+                            row_value_list.append(str(value) + '天')
+                        else:
+                            row_value_list.append(str(value) + '%')
             for key, value in tg_characteristics_page2.items():
                 if key in ["excess_LN", "maxretra_LN", "maxretra_1N", "mexwin_1N"]:
-                    row_name_list.append(ch_data[key])
-                    row_value_list.append(str(value) + '%')
+                    if value is not None:
+                        row_name_list.append(ch_data[key])
+                        row_value_list.append(str(value) + '%')
             for key, value in tg_characteristics_page2.items():
                 if key in ["profit_1Y", "profit_3Y", "profit_6Y", "profit_1N"]:
-                    row_name_list.append(ch_data[key])
-                    row_value_list.append(str(value) + '%')
+                    if value is not None:
+                        row_name_list.append(ch_data[key])
+                        row_value_list.append(str(value) + '%')
 
             folder = os.path.join(self.folder_name, tg['name'], tg['tg_name'])
 
             return {'data': {'info': row_name_list, 'value': row_value_list}, 'folder': folder}
 
-    async def save_tg_extend_info(self, tg_name: list):
+    async def save_all_extend_info(self, tg_name: list):
         headers = {
             'Content-Type': 'application/x-www-form-urlencoded',
             'Referer': 'https://mpservice.com/funda91a99886abf7e/release/pages/strategyDetail/index',
@@ -340,7 +347,7 @@ class Crawl(GetToken):
                 except Exception as e:
                     print(f"Warn:{e}")
 
-    async def get_all_netval(self, tg_name: list):
+    async def save_all_netval(self, tg_name: list):
         headers = {
             'Content-Type': 'application/json',
             'Referer': 'https://mpservice.com/funda91a99886abf7e/release/pages/strategyDetail/index',
@@ -364,7 +371,7 @@ class Crawl(GetToken):
                 except Exception as e:
                     print(f"Warn:{e}")
 
-    async def get_all_warehouse(self, tg_name: list):
+    async def save_all_warehouse(self, tg_name: list):
         headers = {
             'Content-Type': 'application/json',
             'Referer': 'https://mpservice.com/funda91a99886abf7e/release/pages/positionHistory/index',
@@ -493,9 +500,9 @@ class Crawl(GetToken):
         advisers_code = self.get_advisers_code()
         all_strategy = asyncio.run(self.get_all_strategies(advisers_code))
 
-        # asyncio.run(self.get_all_netval(all_strategy))
-        # asyncio.run(self.get_all_warehouse(all_strategy))
-        # asyncio.run(self.save_tg_extend_info(all_strategy))
+        asyncio.run(self.save_all_netval(all_strategy))
+        asyncio.run(self.save_all_warehouse(all_strategy))
+        asyncio.run(self.save_all_extend_info(all_strategy))
 
 
 if __name__ == "__main__":
