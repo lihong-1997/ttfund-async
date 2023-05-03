@@ -31,6 +31,7 @@ class Crawl(GetToken):
         return all_strategy
 
     def get_advisers_code(self) -> list:
+        """获取全部投顾公司的CODE"""
         url = 'https://appactive.1234567.com.cn/AppoperationApi/Modules/GetAdvicerHome'
         headers = {
             'Content-Type': 'application/json',
@@ -80,7 +81,6 @@ class Crawl(GetToken):
             res = await response.json()
             return {'name': adviser['AdvicerName'], 'tg': res}
     
-    # FIXME: 每次获取的策略名字可能不一样，有遗漏
     async def get_strategy_name(self, session: aiohttp.ClientSession, tg_id: dict):
         code_list = ','.join(tg_id['tg'])
         url = 'https://uni-fundts.1234567.com.cn/combine/investAdviserAggr/tgStgSceneAggrByCodeList'
@@ -101,16 +101,64 @@ class Crawl(GetToken):
         }
         async with session.get(url, params=params) as response:
             json_response = await response.json()
-            # FIXME: 应该是这里有问题，没有弄全
-            strategy_info = [
-                {
-                    'name': tg_id['name'],
-                    'tg_name': item['strategyList'][0]['name'],
-                    'code': item['strategyList'][0]['code']
-                }
-                for item in json_response['data'][0]['sceneList']
-            ]
+            strategy_info = []
+            for item in json_response['data'][0]['sceneList']:
+                strategy_list = item['strategyList']
+                for strategy in strategy_list:
+                    strategy_info.append(
+                        {
+                            'name': tg_id['name'], 
+                            'tg_name': strategy['name'],
+                            'code': strategy['code']
+                        })
             return strategy_info
+
+    async def get_tg_debug(self, session: aiohttp.ClientSession, tg_id: list):
+        code_list = ','.join(tg_id)
+        url = 'https://uni-fundts.1234567.com.cn/combine/investAdviserAggr/tgStgSceneAggrByCodeList'
+        params = {
+            'codeList': code_list,
+            'ctoken': self.ctoken,
+            'appVersion': self.app_version,
+            'deviceid': self.device_id,
+            'passportctoken': self.passport_ctoken,
+            'passportid': self.passport_id,
+            'passportutoken': self.passport_utoken,
+            'plat': 'Iphone',
+            'product': 'Fund',
+            'serverversion': self.app_version,
+            'userid': self.user_id,
+            'utoken': self.utoken,
+            'version': self.app_version
+        }
+        async with session.get(url, params=params) as response:
+            json_response = await response.json()
+            # FIXME: 应该是这里有问题，没有弄全
+            strategy_info = []
+            for item in json_response['data'][0]['sceneList']:
+                strategy_list = item['strategyList']
+                for strategy in strategy_list:
+                    strategy_info.append({'tg_name': strategy['name'],'code': strategy['code']})
+
+            return strategy_info
+
+    async def bug_find(self, adviser: str):
+        headers = {
+            'Content-Type': 'application/json',
+            'Referer': 'https://mpservice.com/funda91a99886abf7e/release/pages/question/index',
+            'clientInfo': 'ttjj-iPhone 13 Pro-iOS-iOS16.4.1',
+            'Accept': '*/*',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept-Language': 'zh-Hans-CN;q=1, en-CN;q=0.9, de-CN;q=0.8',
+            'Connection': 'keep-alive',
+            'User-Agent': 'EMProjJijin/6.6.4 (iPhone; iOS 16.4.1; Scale/3.00)',
+            'GTOKEN': self.gtoken
+        }
+        code = ['1MRB2HI', '8TWSRVW', 'UJZVSUO', 'XQR30UU', 'QP9JKF4']
+        async with aiohttp.ClientSession(headers=headers) as session:
+            fetchers = [self.get_tg_debug(session, code)]
+            for finished_task in asyncio.as_completed(fetchers):
+                response = await finished_task
 
     async def get_all_strategies(self, advisers_code: list):
         q = Queue()
@@ -157,8 +205,8 @@ class Crawl(GetToken):
                 response = await finished_task
                 for item in response:
                     folder = os.path.join(self.folder_name, item['name'], item['tg_name'])
-                    if item['name'] == "民生加银基金":
-                        print(item['tg_name'])
+                    # if item['name'] == "民生加银基金":
+                    #     print(item['tg_name'])
                     os.makedirs(folder, exist_ok=True)
                 tg_name.extend(response)
         print(f"一共有 {len(tg_name)} 条策略")
