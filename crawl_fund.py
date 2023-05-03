@@ -22,8 +22,6 @@ class Crawl(GetToken):
         # 存放爬取到的数据的文件名
         self.folder_name = 'DATA2'
         self.error_tgs = []
-        # 连接数不限制
-        self.conn = aiohttp.TCPConnector(limit=0)
         # advisers_code = self.get_advisers_code()
         # self.all_strategy = asyncio.run(self.get_all_strategies(advisers_code))
 
@@ -79,9 +77,10 @@ class Crawl(GetToken):
             'utoken': self.utoken,
         }
         async with session.get(url, params=params) as response:
-            res = await response.read()
-            return {'name': adviser['AdvicerName'], 'tg': json.loads(res)}
-
+            res = await response.json()
+            return {'name': adviser['AdvicerName'], 'tg': res}
+    
+    # FIXME: 每次获取的策略名字可能不一样，有遗漏
     async def get_strategy_name(self, session: aiohttp.ClientSession, tg_id: dict):
         code_list = ','.join(tg_id['tg'])
         url = 'https://uni-fundts.1234567.com.cn/combine/investAdviserAggr/tgStgSceneAggrByCodeList'
@@ -101,8 +100,8 @@ class Crawl(GetToken):
             'version': self.app_version
         }
         async with session.get(url, params=params) as response:
-            res = await response.read()
-            json_response = json.loads(res)
+            json_response = await response.json()
+            # FIXME: 应该是这里有问题，没有弄全
             strategy_info = [
                 {
                     'name': tg_id['name'],
@@ -158,8 +157,11 @@ class Crawl(GetToken):
                 response = await finished_task
                 for item in response:
                     folder = os.path.join(self.folder_name, item['name'], item['tg_name'])
+                    if item['name'] == "民生加银基金":
+                        print(item['tg_name'])
                     os.makedirs(folder, exist_ok=True)
                 tg_name.extend(response)
+        print(f"一共有 {len(tg_name)} 条策略")
         return tg_name
 
     async def get_tg_extend_info(self, session: aiohttp.ClientSession, tg: dict):
@@ -223,8 +225,8 @@ class Crawl(GetToken):
             }
             row_value_list.append(risk_level[data['tgExtendInfo']['RISKLEVEL']])
             # 处理建议持有
-            if data['tgExtendInfo']['RECOMMEND_HOLD_TIME'] is not None:
-                row_value_list.append(data['tgExtendInfo']['RECOMMEND_HOLD_TIME'])
+            if info_dict.get('RECOMMEND_HOLD_TIME') is not None:
+                row_value_list.append(info_dict['RECOMMEND_HOLD_TIME'])
             else:
                 row_value_list.append('--')
             # 处理成立天数
@@ -443,19 +445,15 @@ class Crawl(GetToken):
         advisers_code = self.get_advisers_code()
         all_strategy = asyncio.run(self.get_all_strategies(advisers_code))
 
-        asyncio.run(self.get_all_netval(all_strategy))
-        asyncio.run(self.get_all_warehouse(all_strategy))
-        asyncio.run(self.save_tg_extend_info(all_strategy))
-
-    def run_in_new_loop_1(self, all_strategy):
-        asyncio.run(self.get_all_netval(all_strategy))
-    
-    def run_in_new_loop_2(self, all_strategy):
-        asyncio.run(self.get_all_warehouse(all_strategy))
+        # asyncio.run(self.get_all_netval(all_strategy))
+        # asyncio.run(self.get_all_warehouse(all_strategy))
+        # asyncio.run(self.save_tg_extend_info(all_strategy))
 
 
-startTime = time.time()
-c = Crawl()
-c.run()
-endTime = time.time()
-print("基金数据更新完毕", endTime - startTime)
+if __name__ == "__main__":
+
+    startTime = time.time()
+    c = Crawl()
+    c.run()
+    endTime = time.time()
+    print(f"基金数据更新完毕，耗时 {(endTime - startTime):.2f}s")
