@@ -95,14 +95,9 @@ class GetToken:
         try:
             response = requests.post(url=url, headers=headers, data=data, timeout=self.timeout)
         except Exception as e:
-            print("Error occurs while getting token", e)
+            print('Error occurs while getting token', e)
         else:
             # 解析json
             json_response = response.json()
             self.passport_ctoken = json_response['Data']['PassportCToken']
             self.passport_utoken = json_response['Data']['PassportUToken']
-
-
-if __name__ == '__main__':
-
-    g = GetToken()
